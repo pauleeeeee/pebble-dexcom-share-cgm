@@ -1,0 +1,4 @@
+/build
+/node_modules
+/.lock-waf_darwin_build
+exampleData.json

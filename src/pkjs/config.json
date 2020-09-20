@@ -1,0 +1,181 @@
+[
+    {
+        "type" : "heading",
+        "defaultValue" : "Dexcom Share CGM"
+    },
+    {
+        "type" : "text",
+        "defaultValue" : "Configuration page"
+    },
+    {
+      "type" : "section",
+      "items":[
+          {
+              "type":"heading",
+              "defaultValue":"Dexcom Share Account"
+          },
+          {
+              "type":"input",
+              "messageKey":"UserName",
+              "label":"username",
+              "description":"enter your Dexcom Share username"
+          },
+          {
+              "type":"input",
+              "messageKey":"Password",
+              "label":"password",
+              "description":"enter your Dexcom Share password",
+              "attributes": {
+                "type":"password"
+              }
+          }
+        ]
+      },
+      {
+        "type":"section",
+        "items":[
+            {
+                "type":"heading",
+                "defaultValue":"alerts"
+            },
+            {
+                "type": "toggle",
+                "messageKey": "EnableAlerts",
+                "label": "Enable alerts?",
+                "description": "check this box to enable high and low alerts",
+                "defaultValue": false
+            },
+            {
+                "type": "toggle",
+                "messageKey": "RespectQuietTime",
+                "label": "Respect Pebble's 'Quiet Time'",
+                "description": "alerts are supressed when Quiet Time is active on the Pebble",
+                "defaultValue": true
+            },
+            {
+                "type":"heading",
+                "defaultValue":"low"
+            },
+            {
+                "type":"slider",
+                "label":"low BG value",
+                "defaultValue":"75",
+                "min":"50",
+                "max":"200",
+                "step":"5",
+                "description":"readings lower than this value will alert you",
+                "messageKey":"LowAlertValue"
+            },
+            {
+                "type": "select",
+                "messageKey": "LowVibePattern",
+                "defaultValue": "short",
+                "label": "low alert vibration pattern",
+                "options": [
+                  { 
+                    "label": "short", 
+                    "value": "1" 
+                  },
+                  { 
+                    "label": "long",
+                    "value": "2" 
+                  },
+                  { 
+                    "label": "double",
+                    "value": "3" 
+                  },
+                  { 
+                    "label": "tripple",
+                    "value": "4" 
+                  },
+                  { 
+                    "label": "quad",
+                    "value": "5" 
+                  },
+                  {
+                      "label": "S.O.S.",
+                      "value": "6"
+                  },
+                  {
+                      "label": "bum bum ba-da-bumm",
+                      "value": "7"
+                  }
+                ]
+            },
+            {
+                "type":"slider",
+                "label":"low BG alert snooze",
+                "defaultValue":"15",
+                "min":"0",
+                "max":"60",
+                "step":"5",
+                "description":"number of minutes that low BG alerts will be surpressed after the last alert",
+                "messageKey":"LowSnoozeTimeout"
+            },
+            {
+                "type":"heading",
+                "defaultValue":"high"
+            },
+            {
+                "type":"slider",
+                "label":"high BG value",
+                "defaultValue":"250",
+                "min":"100",
+                "max":"350",
+                "step":"5",
+                "description":"readings higher than this value will alert you",
+                "messageKey":"HighAlertValue"
+            },
+            {
+                "type":"slider",
+                "label":"high BG alert snooze",
+                "defaultValue":"30",
+                "min":"0",
+                "max":"60",
+                "step":"5",
+                "description":"number of minutes that high BG alerts will be surpressed after the last alert",
+                "messageKey":"HighSnoozeTimeout"
+            },
+            {
+                "type": "select",
+                "messageKey": "HighVibePattern",
+                "defaultValue": "short",
+                "label": "high alert vibration pattern",
+                "options": [
+                  { 
+                    "label": "short", 
+                    "value": "1" 
+                  },
+                  { 
+                    "label": "long",
+                    "value": "2" 
+                  },
+                  {
+                    "label": "double",
+                    "value": "3" 
+                  },
+                  { 
+                    "label": "tripple",
+                    "value": "4" 
+                  },
+                  { 
+                    "label": "quad",
+                    "value": "5" 
+                  },
+                  {
+                      "label": "S.O.S.",
+                      "value": "6"
+                  },
+                  {
+                      "label": "bum bum ba-da-bumm",
+                      "value": "7"
+                  }
+                ]
+            }
+        ]
+    },
+    {
+        "type":"submit",
+        "defaultValue":"save"
+    }
+]

@@ -1,0 +1,396 @@
+//this file contains the oAuth logic for the official dexcom api
+//however that API has a 3 hour delay on data :(
+//the other contents in this file may not be up to date since I moved to the other auth system in index.js
+
+
+// require clay package for settings
+var Clay = require('pebble-clay');
+var clayConfig = require('./config.json');
+// override the handleEvents feature in Clay. This way we can intercept values here in JS and then figure out what to do with them
+var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
+// //include MessageQueue system
+var MessageQueue = require('message-queue-pebble');
+
+var applicationCredentials = {
+    client_secret: "xSlehxL8Pjlzm84v",
+    client_id: "ctwy3GSG8w33Kvirl0XEW31Ic6CPRELk",
+    redirect_uri: "https://us-central1-jam-jam-jam.cloudfunctions.net/handleDexcomToken"
+}
+
+//var authURL = "https://api.dexcom.com/v2/oauth2/login?client_id=ctwy3GSG8w33Kvirl0XEW31Ic6CPRELk&redirect_uri=https://us-central1-jam-jam-jam.cloudfunctions.net/handleDexcomToken&response_type=code&scope=offline_access"
+var authURL = "https://api.dexcom.com/v2/oauth2/login?client_id="+applicationCredentials.client_id+"&redirect_uri="+applicationCredentials.redirect_uri+"&response_type=code&scope=offline_access";
+//var authURL = "https://us-central1-jam-jam-jam.cloudfunctions.net/handleDexcomToken?code=secret_code";
+
+var accessCredentials = {
+    access_token: "",
+    expires_in: 7200,
+    token_type: "Bearer",
+    refresh_token: "",
+    lastRefreshed: 0
+  }
+
+
+
+// //declare initial values or lackthereof
+var CGMdata;
+//holding objects for settings
+var storedSettings = null;
+var fetchInterval = 30000; 
+//last alert record
+lastAlert = {
+    low: new Date("1-1-1990").getTime(),
+    high: new Date("1-1-1990").getTime()
+};
+
+Pebble.addEventListener('showConfiguration', function(e) {
+    if (accessCredentials.access_token == ""){
+        Pebble.openURL(authURL);
+    } else {
+        Pebble.openURL(clay.generateUrl());
+    }
+});
+
+
+//this function is called when the watchface is ready
+Pebble.addEventListener("ready", function(e) {
+    console.log('ready');
+    if (localStorage.getItem("accessCredentials")) {
+        accessCredentials = JSON.parse(localStorage.getItem("accessCredentials"));
+    }
+    //for testing
+    //fetchLoop();
+
+
+    var CGM = JSON.parse(localStorage.getItem("CGMdata"));
+    if (CGM){CGMdata = CGM} else {CGMdata={egvs:[{systemTime:""}]}};
+
+    lAlert = JSON.parse(localStorage.getItem("lastAlerts"));
+    if(lAlert){
+        lastAlert = lAlert;
+    }
+    //get settings from local storage
+    var settings = JSON.parse(localStorage.getItem("storedSettings"));
+
+    //if there are settings assign them and begin the fetch loop
+    if (settings) {
+        // console.log('found settings');
+        storedSettings = settings;
+        //start fetchLoop
+        fetchLoop();
+
+    } else {
+        // console.log('no settings');
+        //show notification stating that settings must be configured. Should only ever happen once.
+        Pebble.showSimpleNotificationOnPebble("Configuration needed","Go to the watchface settings inside the Pebble phone app to configure this watchface.")
+    }
+
+});
+
+
+//when the config page is closed...
+Pebble.addEventListener('webviewclosed', function(e) {
+    if (e && !e.response) { return; }
+    result = JSON.parse(decodeURIComponent(e.response));
+    if (result.code){
+        //assumes auth was just completed 
+        //so now request access credentials
+        getAccessCredentials(result.code);
+
+        
+        //so now let's open clay config
+        Pebble.openURL(clay.generateUrl());
+    } else if (!result.code){
+        //assumes auth has already been completed (or has failed) and now the user is updating preferences 
+        //get settings from response object
+        storedSettings = clay.getSettings(e.response, false);
+        //save the settings directly to local storage.
+        localStorage.setItem("storedSettings", JSON.stringify(storedSettings));
+        // console.log(JSON.stringify(storedSettings));
+
+        //start refresh loop
+        console.log('refresh loop');
+        fetchLoop();
+    }
+});
+
+function fetchLoop(){
+    if (((new Date().getTime() - accessCredentials.lastRefreshed) / 1000) > accessCredentials.expires_in) {
+        //refresh the token then fetch data
+        console.log('refresh the token');
+
+        refreshDexcomAccessToken();
+    } else {
+        //fetch data
+        console.log('get the data');
+
+        getDexcomData();
+    }
+
+    //loop every 60 seconds
+    setTimeout(
+        function handler() {
+            fetchLoop();
+        },
+        60000
+    );
+}
+
+function refreshDexcomAccessToken(){
+    var data = "client_secret=" + applicationCredentials.client_secret + "&client_id=" + applicationCredentials.client_id + "&refresh_token=" + accessCredentials.refresh_token + "&grant_type=refresh_token&redirect_uri=" + applicationCredentials.redirect_uri;
+
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+
+    xhr.onload = function(e) {
+        if (xhr.readyState == 4) {
+          // 200 - HTTP OK
+            if(xhr.status == 200) {
+                var response = xhr.responseText;
+                console.log('with brakcets');
+                console.log(response["access_token"]);
+                console.log(response["refresh_token"]);
+                console.log('with periods');
+                console.log(response.access_token);
+                console.log(response.refresh_token);
+                accessCredentials.access_token = response["access_token"];
+                accessCredentials.refresh_token = response["refresh_token"];
+                accessCredentials.lastRefreshed = new Date().getTime();
+                console.log("token refreshed");
+                console.log(response);
+                console.log(JSON.stringify(response));
+                localStorage.setItem("accessCredentials",JSON.stringify(accessCredentials));
+                getDexcomData();
+            } else if(xhr.status == 400){
+                Pebble.showSimpleNotificationOnPebble("Authorization needed","Your log in to Dexcom servers has expired. Please visit the watch configuration page to log in again.");
+                accessCredentials.access_token = "";
+                console.log("failed to get data - need to re authenticate");
+                //Pebble.openURL(authURL);
+            }
+        }
+    }
+
+    xhr.open("POST", "https://api.dexcom.com/v2/oauth2/token");
+    xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader("cache-control", "no-cache");
+
+    xhr.send(data);
+}
+
+function getDexcomData(){
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+
+    xhr.onload = function(e) {
+        if (xhr.readyState == 4) {
+          // 200 - HTTP OK
+            if(xhr.status == 200) {
+                // console.log(xhr.responseText);
+                // var response = JSON.parse(xhr.responseText);
+                // console.log(response);
+                var response = JSON.parse(xhr.responseText);
+                console.log(JSON.stringify(response));
+                //check to see if this data is old. If it's old... do nothing.
+                if (response.egvs[0].systemTime == CGMdata.egvs[0].systemTime) {
+                    console.log('did not send appmessage');
+                    return
+
+                } else {
+                    //if it's new, construct an appmessage using the appropriate keys defined in package.json and in nightscout-double-vision.h
+                    //minutes ago is simple math that subtracts the datetime from now and rounds to nearest whole minute
+                    //direction is an int defined by directionStringToInt function
+                    //transform delta does some formatting
+                    var message = {
+                        "SGV": response.egvs[0].value+"",
+                        "Direction": directionStringToInt(response.egvs[0].trend),
+                        "MinutesAgo": Math.round((new Date().getTime() - new Date(response.egvs[0].systemTime).getTime()) / 1000 / 60),
+                        "SendAlert": makeAlert(response.egvs[0].value),
+                        "RespectQuietTime": (storedSettings.RespectQuietTime.value ? 1: 0)
+                    };
+
+                    console.log(JSON.stringify(message));
+
+                    //send the app message and use a success callback. On success, store the message to localStorage so that it can be compared on the next loop.
+                    Pebble.sendAppMessage(message,function(){
+                        CGMdata = response;
+                        localStorage.setItem("CGMdata", JSON.stringify(response));
+                        console.log('message sent!');
+                    });
+                }
+            } else if (xhr.status == 401){
+                console.log("failed to get data - need to refresh access token");
+                var response = xhr.responseText;
+                console.log(response);
+                refreshDexcomAccessToken();
+            } else {
+                console.log('other')
+                console.log(xhr.status);
+                console.log(xhr.responseText);
+                console.log(xhr.responseType);
+            }
+        }
+    }
+
+    // var now = getISOwithOffset(new Date(new Date().getTime() + 8.64e+7));
+    // var past = getISOwithOffset(new Date(new Date().getTime() - 3.6e+6));
+    var now = new Date().toISOString().split(".")[0];
+    var past = new Date(new Date().getTime() - 8.64e+7).toISOString().split(".")[0];
+
+    console.log(now);
+    console.log(past);
+    
+    xhr.open("GET", "https://api.dexcom.com/v2/users/self/egvs?startDate="+past+"&endDate="+now);
+    xhr.setRequestHeader("authorization", "Bearer " + accessCredentials.access_token);
+
+    xhr.send();
+    
+}
+
+function getAccessCredentials(accessCode){
+    var data = "client_secret=" + applicationCredentials.client_secret + "&client_id=" + applicationCredentials.client_id + "&code=" + accessCode + "&grant_type=authorization_code&redirect_uri=" + applicationCredentials.redirect_uri;
+    
+    var xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+    
+    xhr.onload = function(e) {
+        if (xhr.readyState == 4) {
+          // 200 - HTTP OK
+            if(xhr.status == 200) {
+                // console.log(xhr.responseText);
+                var response = JSON.parse(xhr.responseText);
+                console.log("response:");
+                console.log(response);
+                console.log(response.access_token);
+
+                accessCredentials.access_token = response["access_token"];
+                accessCredentials.refresh_token = response["refresh_token"];
+                accessCredentials.lastRefreshed = new Date().getTime();
+                localStorage.setItem("accessCredentials",JSON.stringify(accessCredentials));
+                console.log(JSON.stringify(accessCredentials));
+                getDexcomData();
+            }
+        }
+    }
+    
+    xhr.open("POST", "https://api.dexcom.com/v2/oauth2/token");
+    xhr.setRequestHeader("content-type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader("cache-control", "no-cache");
+    
+    xhr.send(data);
+}
+
+
+//helper functions
+function getISOwithOffset(date){
+    var timezone_offset_min = date.getTimezoneOffset(),
+	offset_hrs = parseInt(Math.abs(timezone_offset_min/60)),
+	offset_min = Math.abs(timezone_offset_min%60),
+	timezone_standard;
+
+    if(offset_hrs < 10)
+        offset_hrs = '0' + offset_hrs;
+
+    if(offset_min < 10)
+        offset_min = '0' + offset_min;
+
+    // Add an opposite sign to the offset
+    // If offset is 0, it means timezone is UTC
+    if(timezone_offset_min < 0)
+        timezone_standard = '+' + offset_hrs + ':' + offset_min;
+    else if(timezone_offset_min > 0)
+        timezone_standard = '-' + offset_hrs + ':' + offset_min;
+    else if(timezone_offset_min == 0)
+        timezone_standard = 'Z';
+
+    // Timezone difference in hours and minutes
+    // String such as +5:30 or -6:00 or Z
+    //console.log(timezone_standard);
+
+    var dt = date,
+	current_date = dt.getDate(),
+	current_month = dt.getMonth() + 1,
+	current_year = dt.getFullYear(),
+	current_hrs = dt.getHours(),
+	current_mins = dt.getMinutes(),
+	current_secs = dt.getSeconds(),
+	current_datetime;
+
+    // Add 0 before date, month, hrs, mins or secs if they are less than 0
+    current_date = current_date < 10 ? '0' + current_date : current_date;
+    current_month = current_month < 10 ? '0' + current_month : current_month;
+    current_hrs = current_hrs < 10 ? '0' + current_hrs : current_hrs;
+    current_mins = current_mins < 10 ? '0' + current_mins : current_mins;
+    current_secs = current_secs < 10 ? '0' + current_secs : current_secs;
+
+    // Current datetime
+    // String such as 2016-07-16T19:20:30
+    current_datetime = current_year + '-' + current_month + '-' + current_date + 'T' + current_hrs + ':' + current_mins + ':' + current_secs;
+
+    //console.log(current_datetime + timezone_standard);
+
+    return current_datetime;
+}
+
+
+//takes the string returned by nightscout and turns it into an int
+function directionStringToInt(direction) {
+    switch (direction) {
+        case "none":
+            return 0;
+        case "doubleUp":
+            return 1;
+        case "singleUp":
+            return 2;
+        case "fortyFiveUp":
+            return 3;
+        case "flat":
+            return 4;
+        case "fortyFiveDown":
+            return 5;
+        case "singleDown":
+            return 6;
+        case "doubleDown":
+            return 7;
+        case 'notComputable':
+            return 8;
+        case 'rateOutOfRange':
+            return 9;
+        default:
+            return 0;
+    }
+};
+
+
+
+function makeAlert(sgv){
+
+    if (!storedSettings.EnableAlerts.value) {
+        // console.log ('alerts disabled');
+        return 0;
+
+    } else {
+
+        var integer = 0;
+    
+        if (sgv < storedSettings.LowAlertValue.value && (new Date().getTime() - lastAlert.low) > storedSettings.LowSnoozeTimeout.value * 60 * 1000){
+            integer = Number(storedSettings.LowVibePattern.value);
+            lastAlert.low = new Date().getTime();
+            // console.log('met low criteria');
+
+        } else if (sgv > storedSettings.HighAlertValue.value && (new Date().getTime() - lastAlert.high) > storedSettings.HighSnoozeTimeout.value * 60 * 1000){
+            integer = Number(storedSettings.HighVibePattern.value);
+            lastAlert.high = new Date().getTime();
+            // console.log('met high criteria');s
+        }
+        // console.log(JSON.stringify(lastAlert));
+        localStorage.setItem("lastAlert", JSON.stringify(lastAlert));
+    
+        return integer;
+
+    }
+
+}
+
+
+
+
+

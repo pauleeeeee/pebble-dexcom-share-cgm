@@ -1,0 +1,100 @@
+{
+  "name": "dexcom-share-cgm",
+  "author": "swansswansswansswanssosoft",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app",
+    "dexcom",
+    "cgm"
+  ],
+  "private": true,
+  "dependencies": {
+    "message-queue-pebble": "^1.0.0",
+    "pebble-battery-bar": "^1.0.10",
+    "pebble-bluetooth-icon": "^1.0.8",
+    "pebble-clay": "^1.0.4"
+  },
+  "pebble": {
+    "displayName": "Dexcom Share CGM",
+    "capabilities": [
+      "configurable"
+    ],
+    "uuid": "b8b93f91-5953-444f-8867-4f4376f22324",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": {
+      "SGV": 2,
+      "UserName": 3,
+      "Password": 4,
+      "Direction": 6,
+      "MinutesAgo": 7,
+      "IntervalTime": 50,
+      "EnableAlerts": 51,
+      "RespectQuietTime": 52,
+      "LowAlertValue": 53,
+      "HighAlertValue": 54,
+      "LowSnoozeTimeout": 55,
+      "HighSnoozeTimeout": 56,
+      "SendAlert": 60
+    },
+    "resources": {
+      "media": [
+        {
+          "type": "png",
+          "name": "IMAGE_NONE",
+          "file": "images/none.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_DOWN45",
+          "file": "images/down45.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_DOWNDOWN",
+          "file": "images/downdown.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_DOWN",
+          "file": "images/down.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_FLAT",
+          "file": "images/flat.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_UP45",
+          "file": "images/up45.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_UPUP",
+          "file": "images/upup.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_UP",
+          "file": "images/up.png"
+        },
+        {
+          "menuIcon": true,
+          "type": "png",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/logo.png"
+        }
+      ]
+    }
+  }
+}
