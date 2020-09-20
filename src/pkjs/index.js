@@ -109,7 +109,6 @@ function fetchLoop(){
 }
 
 function refreshDexcomAccessToken(){
-    //var data = "client_secret=" + applicationCredentials.client_secret + "&client_id=" + applicationCredentials.client_id + "&refresh_token=" + accessCredentials.refresh_token + "&grant_type=refresh_token&redirect_uri=" + applicationCredentials.redirect_uri;
     var data = {
         "password": accessCredentials.password,
         "applicationId": dexcom.applicationID,
@@ -135,7 +134,7 @@ function refreshDexcomAccessToken(){
                 localStorage.setItem("accessCredentials",JSON.stringify(accessCredentials));
                 getDexcomData();
             } else if(xhr.status == 400){
-                //Pebble.showSimpleNotificationOnPebble("Authorization needed","Your log in to Dexcom servers has expired. Please visit the watch configuration page to log in again.");
+                if(accessCredentials.sessionID != ""){Pebble.showSimpleNotificationOnPebble("Authorization needed","Your log in to Dexcom servers has expired. Please visit the watch configuration page to log in again.");};
                 accessCredentials.sessionID = "";
                 console.log("failed to get data - need to re authenticate");
             }
@@ -194,11 +193,13 @@ function getDexcomData(){
                 console.log("failed to get data - need to refresh access token");
                 var response = xhr.responseText;
                 console.log(response);
+                refreshDexcomAccessToken();
             } else {
                 console.log('other')
                 console.log(xhr.status);
                 console.log(xhr.responseText);
                 console.log(xhr.responseType);
+                refreshDexcomAccessToken();
             }
         }
     }
