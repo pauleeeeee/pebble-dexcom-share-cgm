@@ -85,6 +85,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
 
     //start refresh loop
     console.log('refresh loop');
+    accessCredentials.sessionID = "";
     fetchLoop();
 });
 
@@ -150,7 +151,7 @@ function getDexcomData(){
     //xhr.withCredentials = true;
     var URL = dexcom.dataURL + '?sessionID=' + accessCredentials.sessionID + '&minutes=' + 1440 + '&maxCount=' + 1;
     
-    xhr.open("POST", URL, true);
+    xhr.open("POST", URL);
 
     xhr.setRequestHeader("User-Agent", dexcom.agent);
     xhr.setRequestHeader("Content-type", dexcom.contentType);
@@ -164,7 +165,7 @@ function getDexcomData(){
                 // var response = JSON.parse(xhr.responseText);
                 // console.log(response);
                 var response = JSON.parse(xhr.responseText);
-                console.log(response);
+                console.log(xhr.responseText);
                 //check to see if this data is old. If it's old... do nothing.
                 if (JSON.stringify(response) == JSON.stringify(CGMdata)) {
                     console.log('did not send appmessage');
