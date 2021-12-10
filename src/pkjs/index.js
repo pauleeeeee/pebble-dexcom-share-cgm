@@ -175,7 +175,7 @@ function getDexcomData(){
                     //minutesAgo could be improved   
                     var message = {
                         "SGV": response[0].Value+"",
-                        "Direction": response[0].Trend,
+                        "Direction": Number(response[0].Trend),
                         "MinutesAgo": 0,
                         "SendAlert": makeAlert(response[0].Value),
                         "RespectQuietTime": (storedSettings.RespectQuietTime.value ? 1: 0)
